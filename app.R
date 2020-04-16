@@ -6,6 +6,17 @@ library(tmap)
 library(tidygeocoder)
 library(dplyr)
 
+country_df <- read.csv('data/country_data/countries of the world.csv')
+coordinate_df <- read.csv('data/country_data/countries.csv')
+country_df[,c(1)]=trimws(country_df[,c(1)])
+names(coordinate_df)[names(coordinate_df) == "name"] <- "Country"
+names(coordinate_df)[names(coordinate_df) == "latitude"] <- "lat"
+names(coordinate_df)[names(coordinate_df) == "longitude"] <- "long"
+mergedData <<- merge(x=country_df, y=coordinate_df, by="Country", all.x=TRUE)
+cleanData <<- mergedData[complete.cases(mergedData), ]
+print(cleanData)
+
+
 ui <- bootstrapPage(
   tags$style(type = "text/css", "html, body {width:100%;height:100%}"),
   leafletOutput("map", width = "100%", height = "100%"),
