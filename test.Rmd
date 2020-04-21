@@ -65,7 +65,7 @@ plot_change_deaths <- function(country) {
   country_set <- covid_set %>% filter(Country.Region == country)
   country_set.agg <- aggregate(select(country_set, Confirmed, Deaths, Recovered), by=country_set['date_str'], sum)
   country_set.new_by_week <- country_set.agg %>% mutate(new_deaths_by_week=Deaths - lag(Deaths, 7))
-  plot <- ggplot(country_set.new_by_week, mapping = aes(Deaths, new_deaths_by_week)) + geom_line() + labs(title='Trajectory of Deaths', x='New Deaths (past week)', y='Total Deaths')
+  plot <- ggplot(country_set.new_by_week, mapping = aes(Deaths, new_deaths_by_week)) + geom_line() + labs(title='Trajectory of Deaths', y='New Deaths (past week)', x='Total Deaths')
   return(plot)
 }
 
@@ -75,7 +75,7 @@ plot_change_confirmed <- function(country) {
   country_set <- covid_set %>% filter(Country.Region == country)
   country_set.agg <- aggregate(select(country_set, Confirmed, Deaths, Recovered), by=country_set['date_str'], sum)
   country_set.new_by_week <- country_set.agg %>% mutate(new_confirmed_by_week=Confirmed - lag(Confirmed, 7))
-  plot <- ggplot(country_set.new_by_week, mapping = aes(Confirmed, new_confirmed_by_week)) + geom_line() + labs(title='Trajectory of Confirmed Cases', x='New Confirmed Cases (past week)', y='Total Confirmed Cases')
+  plot <- ggplot(country_set.new_by_week, mapping = aes(Confirmed, new_confirmed_by_week)) + geom_line() + labs(title='Trajectory of Confirmed Cases', y='New Confirmed Cases (past week)', x='Total Confirmed Cases')
   return(plot)
 }
 
