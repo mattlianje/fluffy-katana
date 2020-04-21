@@ -1,0 +1,131 @@
+---
+title: "COVID-19 Forecasting"
+author: "Ashar Kandathil"
+date: "21/04/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(zoo)
+library(tseries)
+library(forecast)
+```
+
+## Intro
+
+We hope to create a time series analysis of the global COVID-19 situation. Using ARIMA modeling, we wish to generate useful forecasts of what the situation could be like before and after various quarantine and social-distancing protocols were enacted, to see whether the "curve is flattening" and to what extent. For this report analyses we will only focus on 1 country. 
+For the rest of the countries we will forecast the further spread given the latest data, to be displayed on our Rshiny dashboard.
+We understand that this is an extremely complex topic with numerous factors that determine the rate of spread, death, and recoveries for any given country. However, to simplify things we will carry on with the assumption that in order to combat the spread, there was a specific date in which preventative measures were enabled for the given country.
+
+Note: Our global data starts from January 22, 2020. The first cases of the virus were recorded in November of 2019. Given our small dataset, we assume non-seasonality.
+```{r cars}
+# READ AND AUGMENT DATA
+
+covid_data = read.csv(file.path(getwd(), "data", "covid_data", "covid_19_clean_complete.csv"), header = TRUE, stringsAsFactors = FALSE)
+covid_data$Date <- as.Date(covid_data$Date, format="%m/%d/%y")
+dates <- unique(covid_data$Date)
+firstDate = dates[1] # Jan 22, 2020
+
+confirmed_df <- aggregate(Confirmed ~ Country.Region + Date, FUN = sum, data=covid_data)
+death_df <- aggregate(Deaths ~ Country.Region + Date, FUN = sum, data=covid_data)
+recovery_df <- aggregate(Recovered ~ Country.Region + Date, FUN = sum, data=covid_data)
+
+partial_merge <- merge(confirmed_df, death_df, by = c("Country.Region", "Date"))
+covid_df <- merge(partial_merge, recovery_df, by = c("Country.Region", "Date"))
+
+countries <- unique(covid_df$Country.Region)
+countries_ts <- lapply(countries, function (x) {
+  country_ts <- covid_df %>% filter(Country.Region == x) %>% select(c(Confirmed, Deaths, Recovered))
+  ts(country_ts, start = as.Date("2020-1-22"), frequency = 365)
+})
+
+```
+
+```{r pressure, echo=FALSE}
+# FUNCTION DEFINITIONS
+
+get_country_ts <- function(country_name){
+  idx = which(countries == country_name)[[1]]
+  countries_ts[[idx]]
+}
+
+augmented_dickey_fuller <- function(c_ts, series, regular, lag_order) {
+  if(regular==FALSE){
+    adf.test(diff(log(c_ts[, series])), alternative = "stationary", k = lag_order)
+  } else {
+    adf.test(c_ts[, series], alternative = "stationary", k = lag_order)
+  }
+}
+
+date_filtered_zoo <- function(country_name, endDate) {
+  wantedDates <- dates[between(dates, firstDate, as.Date(endDate))]
+  country_ts <- covid_df %>% filter(Country.Region == country_name, between(dates, firstDate, as.Date(endDate))) %>% select(Confirmed)
+  zoo(country_ts, wantedDates)
+}
+
+plot_zoo <- function(country_zoo, country_name) {
+  autoplot(country_zoo, main = paste("COVID-19 Confirmed Cases in", country_name)) + labs(x = "Date", y = "Number of People")
+}
+
+plot_ts <- function(country_ts, country_name) {
+  autoplot(country_ts, main = paste("COVID-19 Statistics in", country_name, "Since Jan 22")) + labs(x = "Time", y = "Number of People") + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())
+}
+```
+
+## China
+
+Let us begin by looking at the country where the disease was first encountered - China. By looking into how the disease spread and China handled the situation first, we may be able anticipate how other countries should handle the situation.
+ 
+```{r}
+# China
+china_zoo <- date_filtered_zoo("China", "2020-4-12")
+plot_zoo(china_zoo, "China")
+```
+The first graph we want to look at is the number of confirmed cases in China to date. As we can see from our preliminary plot, there was a sharp spike in cases from January till March, after which the curve appears to be "flattened".
+
+From external research, it appears that China began its lockdown measures on Wuhan around January 29, which continued to rollout across the country. (https://www.edinburghnews.scotsman.com/health/how-long-has-china-been-lockdown-heres-when-china-and-wuhan-went-lockdown-coronavirus-restrictions-approach-end-2514773). However, it takes a couple weeks for the effects of such measures to show, as people can be asymptomatic for 14 days. For simplicity, we will assume that February 12 (2 weeks after preventative measures) as the cut-off point for all of China.
+
+Let us forecast the number of potential cases that would exist in China today, if no preventative measures were taken. 
+### Analysis
+```{r}
+before_china_zoo <- date_filtered_zoo("China", "2020-2-12")
+plot_zoo(before_china_zoo, "China")
+```
+To start with, we must first determine the stationarity of our time series with the Augmented Dickey-Fuller test. We can assume a k-value (lag) of *n/5 = 4.2 ~ 4* as recommended for non-seasonal series [Hyndman].
+```{r}
+china_ts <- get_country_ts("China")
+before_china_ts <- head(china_ts, 21) # Feb 12 is 3 weeks from Jan 22 = 21 days
+augmented_dickey_fuller(before_china_ts, "Confirmed", TRUE, 4)
+```
+According to the test, it appears that the data is non-stationary given the high p-value. Let us remove the unequal variances and trend components, by taking the log and difference of the series, respectively.
+```{r}
+augmented_dickey_fuller(before_china_ts, "Confirmed", FALSE, 4)
+```
+Now the p-value is very small and clearly significant. Hence, the data is now stationary.
+
+Let us plot the ACF and PACF charts to determine the *p* and *q* portions of our ARIMA model.
+```{r}
+ggAcf(diff(log(before_china_ts[,"Confirmed"]))) + ggtitle("Confirmed Cases ACF Plot")
+ggPacf(diff(log(before_china_ts[,"Confirmed"]))) + ggtitle("Confirmed Cases PACF Plot")
+```
+It appears that the series is mostly represented by an Auto-Regressive (AR) model due to the entire PACF plot cutting off and the ACF plot only cutting off after the 2nd lag. We would assume an ARIMA(0,1,2) model. However, it is wise to experiment with different combinations to find the best ARIMA(p,d,q) values that have the lowest AIC and BIC.
+
+Rather than conduct this manually, we will use the `auto.arima()` function to calculate it automatically for us, with the `seasonal`, `stepwise`, and `approximation` parameters set to `FALSE` so that the best model can be chosen.
+```{r}
+china_fit <- auto.arima(before_china_ts[, "Confirmed"], seasonal = FALSE, stepwise = FALSE, approximation = FALSE)
+china_fit
+```
+As we see from the output, our series follows an ARIMA(1,2,0) model (contrary to our initial estimation of ARIMA(0,1,2)).
+
+Let us now forecast the infection rate if China had not taken any preventative measures, for a month after February 12.
+```{r}
+china_fore <- forecast(china_fit, h = 30, level = 95)
+plot(china_fore, ylab = "Number of People", main = "Forecasts for Confirmed Cases from Feb 12", xlab = "Time", xaxt = "n")
+```
+As seen from the line in blue, our forecasting till March 12 is approximately 100,000 infections (20,000 higher than the Confirmed cases by April 12), with 95% *prediction intervals* going upwards of 200,000 infections.
+
+Therefore, we can infer that the preventative measure to slow the spread of COVID-19 truly are "flattening the curve".
