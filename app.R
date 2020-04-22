@@ -62,6 +62,12 @@ transparent_theme <-  theme(
   panel.background = element_rect(fill = "transparent",colour = NA),
   plot.background = element_rect(fill = "transparent",colour = NA)
 )
+
+white_theme <- theme(
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank(),
+  plot.background = element_rect(fill = "transparent",colour = NA)
+)
 # plotting deaths function
 # USAGE: plot_deaths('Canada')
 plot_deaths <- function(country) {
@@ -110,8 +116,6 @@ forecast_confirmed <- function(country) {
   country_ts <- ts(country_ts, start = as.Date("2020-1-22"), frequency = 365)
   fit <- auto.arima(country_ts, seasonal = FALSE, stepwise = FALSE, approximation = FALSE)
   fore <- forecast(fit, h = 30, level = 90)
-  graphics.off()
-  #colnames(fore) <-  c("time", "point_forecast", "lo_90", "hi_90")
   print(fore)
   
   # Create a dataframe from 'fore'
@@ -119,12 +123,10 @@ forecast_confirmed <- function(country) {
   result_df <- tibble::rownames_to_column(result_df, "point")
   rownames(result_df) <- NULL
   colnames(result_df) <- c("point","forecast","lo", "hi")
-  print(result_df)
-
-  tester <- plot(result_df$point, result_df$forecast)
-  tester_2 <- ggplot(data = result_df, mapping = aes(x = point, y = forecast)) + geom_line()
   final_plot <- plot(fore, ylab = "Number of People", main = paste("Forecast for Number of Cases in", country), xlab = "Time", xaxt = "n")
-  return(final_plot)
+  ashar_plot <- autoplot(fore, ylab = "Number of People", main = paste("Forecast for Number of Cases in", country), xlab = "Time", xaxt = "n") +
+    theme_classic() + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())
+  return(ashar_plot)
 }
 
 forecast_confirmed("Canada")
@@ -134,17 +136,17 @@ ui <- bootstrapPage(theme = shinytheme('cosmo'),
   leafletOutput("map", width = "100%", height = "100%"),
   absolutePanel(top = 10, right = 20,
                 useShinyjs(),
-                sliderInput("date_slider", "Date (cumulative)", min = as.Date('2020-1-20'),
+                sliderInput("date_slider", "Date (cumulative)", min = as.Date('2020-1-22'),
                             max =as.Date('2020-5-20'),value=as.Date("2020-4-01"),timeFormat="%b %d - %Y"),
                 selectInput("dimension", "Country (projections)",
                             main_df$Country, selected = "Canada", multiple = FALSE
                 ),
                 actionButton(inputId = "button", label = "show/hide graphs",
                              style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
-                #plotOutput("time_series", height="125px"),
                 plotOutput("plot_confirmed", height="125px"),
                 plotOutput("plot_change_confirmed", height="125px"),
-                plotOutput("plot_deaths", height="125px")#,
+                plotOutput("plot_deaths", height="125px"),
+                plotOutput("time_series", height="125px"),#,
                 #checkboxInput("legend", "Show legend", TRUE)
   )
 )
@@ -185,7 +187,10 @@ server <- function(input, output, session) {
   
   output$time_series <- renderPlot({
     country <- input$dimension
+    options(scipen=10000)
+    par(mar=rep(2,4))
     plot(forecast_confirmed(country))
+    #plot(forecast_confirmed(country), ylab = "Number of People", main = paste("Forecast for Number of Cases in", country), xlab = "Time", xaxt = "n")
   })
   
   filteredData2 <- reactive({
@@ -256,13 +261,13 @@ server <- function(input, output, session) {
       clearShapes() %>%
       clearMarkers() %>%
       addCircleMarkers(radius = ~as.numeric(Deaths)/400, weight = 1, color = "#f26363",
-                 fillColor = ~pal_3(as.numeric(Deaths)), fillOpacity = 0.7, group = "Deaths", popup = ~paste(as.numeric(Deaths), Country)
+                 fillColor = ~pal_3(as.numeric(Deaths)), fillOpacity = 0.7, group = "Deaths", popup = ~paste(as.numeric(Deaths), "dead:", Country)
       ) %>%
       addCircleMarkers(radius = ~as.numeric(Recovered)/500, weight = 1, color = "#f26363",
-                       fillColor = ~pal_4(as.numeric(Recovered)), fillOpacity = 0.7, group = "Recovered", popup = ~paste(as.numeric(Recovered), Country)
+                       fillColor = ~pal_4(as.numeric(Recovered)), fillOpacity = 0.7, group = "Recovered", popup = ~paste(as.numeric(Recovered), "recovered:", Country)
       ) %>%
       addCircleMarkers(radius = ~as.numeric(Confirmed)/2000, weight = 1, color = "#f26363",
-                       fillColor = ~pal_5(as.numeric(Confirmed)), fillOpacity = 0.7, group = "Confirmed", popup = ~paste(as.numeric(Confirmed), Country)
+                       fillColor = ~pal_5(as.numeric(Confirmed)), fillOpacity = 0.7, group = "Confirmed", popup = ~paste(as.numeric(Confirmed), "confirmed:", Country)
       ) %>%
       addLayersControl(
         baseGroups = c("Deaths", "Confirmed", "Recovered"),
