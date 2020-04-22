@@ -8,14 +8,22 @@ library(dplyr)
 library(shinythemes)
 library(ggplot2)
 library(shinyjs)
+library(zoo)
+library(tseries)
+library(forecast)
 
 ### Importing Data ###
 country_df <- read.csv('data/country_data/countries of the world.csv')
 coordinate_df <- read.csv('data/country_data/countries.csv')
 covid_df <- read.csv('data/covid_data/covid_19_clean_complete.csv')
+# Prediction import
 covid_set <- read.csv('data/covid_data/covid_19_clean_complete.csv')
 covid_set <- covid_set %>% mutate(date_str =  as.Date(as.POSIXct(Date, format="%m/%d/%y"))) %>% arrange(date_str)
 covid_set
+# Time series import
+covid_data = read.csv(file.path(getwd(), "data", "covid_data", "covid_19_clean_complete.csv"), header = TRUE, stringsAsFactors = FALSE)
+covid_data$Date <- as.Date(covid_data$Date, format="%m/%d/%y")
+covid_data <- aggregate(Confirmed ~ Country.Region + Date, FUN = sum, data=covid_data)
 
 ### Cleaning and formatting Data ###
 
@@ -97,22 +105,46 @@ plot_change_confirmed <- function(country) {
   return(plot)
 }
 
+forecast_confirmed <- function(country) {
+  country_ts <- covid_data %>% filter(Country.Region == country) %>% select(c(Confirmed))
+  country_ts <- ts(country_ts, start = as.Date("2020-1-22"), frequency = 365)
+  fit <- auto.arima(country_ts, seasonal = FALSE, stepwise = FALSE, approximation = FALSE)
+  fore <- forecast(fit, h = 30, level = 90)
+  graphics.off()
+  #colnames(fore) <-  c("time", "point_forecast", "lo_90", "hi_90")
+  print(fore)
+  
+  # Create a dataframe from 'fore'
+  result_df <- as.data.frame(fore)
+  result_df <- tibble::rownames_to_column(result_df, "point")
+  rownames(result_df) <- NULL
+  colnames(result_df) <- c("point","forecast","lo", "hi")
+  print(result_df)
+
+  tester <- plot(result_df$point, result_df$forecast)
+  tester_2 <- ggplot(data = result_df, mapping = aes(x = point, y = forecast)) + geom_line()
+  final_plot <- plot(fore, ylab = "Number of People", main = paste("Forecast for Number of Cases in", country), xlab = "Time", xaxt = "n")
+  return(final_plot)
+}
+
+forecast_confirmed("Canada")
+
 ui <- bootstrapPage(theme = shinytheme('cosmo'),
   tags$style(type = "text/css", "html, body {width:100%;height:100%}"),
   leafletOutput("map", width = "100%", height = "100%"),
   absolutePanel(top = 10, right = 20,
                 useShinyjs(),
-                sliderInput("date_slider", "Date (cumulative)", min = as.Date('2019-11-1'),
-                            max =as.Date('2020-8-20'),value=as.Date("2020-4-01"),timeFormat="%b %d - %Y"),
+                sliderInput("date_slider", "Date (cumulative)", min = as.Date('2020-1-20'),
+                            max =as.Date('2020-5-20'),value=as.Date("2020-4-01"),timeFormat="%b %d - %Y"),
                 selectInput("dimension", "Country (projections)",
-                            main_df$Country, selected = "Afghanistan", multiple = FALSE
+                            main_df$Country, selected = "Canada", multiple = FALSE
                 ),
                 actionButton(inputId = "button", label = "show/hide graphs",
                              style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
-                plotOutput("plot_confirmed", height="150px"),
-                #plotOutput("plot_recovered", height="150px"),
-                plotOutput("plot_change_deaths", height="150px"),
-                plotOutput("plot_deaths", height="150px"),#,
+                #plotOutput("time_series", height="125px"),
+                plotOutput("plot_confirmed", height="125px"),
+                plotOutput("plot_change_confirmed", height="125px"),
+                plotOutput("plot_deaths", height="125px")#,
                 #checkboxInput("legend", "Show legend", TRUE)
   )
 )
@@ -123,27 +155,38 @@ server <- function(input, output, session) {
     shinyjs::toggle("plot_deaths")
     shinyjs::toggle("plot_confirmed")
     shinyjs::toggle("plot_change_deaths")
+    shinyjs::toggle("plot_change_confirmed")
     shinyjs::toggle("plot_recovered")
   })
   output$plot_deaths <- renderPlot({
     country <- input$dimension
     plot(plot_deaths(country))
-  }, bg="transparent")
+  }) # or }, bg="transparent")
   
   output$plot_confirmed <- renderPlot({
     country <- input$dimension
     plot(plot_confirmed(country))
-  }, bg="transparent")
+  })
   
   output$plot_recovered <- renderPlot({
     country <- input$dimension
     plot(plot_recovered(country))
-  }, bg="transparent")
+  })
   
   output$plot_change_deaths <- renderPlot({
     country <- input$dimension
     plot(plot_change_deaths(country))
-  }, bg="transparent")
+  })
+  
+  output$plot_change_confirmed <- renderPlot({
+    country <- input$dimension
+    plot(plot_change_confirmed(country))
+  })
+  
+  output$time_series <- renderPlot({
+    country <- input$dimension
+    plot(forecast_confirmed(country))
+  })
   
   filteredData2 <- reactive({
     mergedData[as.numeric(cleanData$Deathrate) >= input$range[1] & as.numeric(cleanData$Deathrate) <= input$range[2],]
