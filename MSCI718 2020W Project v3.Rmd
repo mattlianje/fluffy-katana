@@ -1,5 +1,5 @@
 ---
-title: "MSCI 718 Mini-Project"
+title: "MSCI 718 Mini-Project: COVID-19 Time Series Analysis and Visualization"
 author: "Matthieu Court, Ashar Kandathil, Tyler Lam, Kevin Lee"
 date: "April 22, 2020"
 output: pdf_document
@@ -7,31 +7,64 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(zoo)
+library(tseries)
+library(forecast)
+library(gridExtra)
 ```
 
-*Instructions: Please complete this assignment and submit online to the LEARN Dropbox as a PDF; the PDF will be considered complete for marking. Also upload any source files, for example, any .R or .Rmd files that you used.*
+# Data  
 
-The final project deliverable must include a **PDF report (max 6 pages, references not included)** and any source code for your project.
+Due to the current state of the world from the COVID-19 pandemic (as of April 22nd, 2020) and the rise of visualization tools being used to keep track of COVID-19 statistics across the world, we were interested in using concepts that were learned in MSCI 718 and new statistical techniques, more specifically time series analysis and interactive data visualiztion dashboard, to build a deeper understanding of the coronavirus. 
 
-**NOTE:** the emphasis **must** be on the application, interpretation, and communication of the statistical method. As part of this, you are **not allowed** to do black-box methods like neural nets. As you've seen, this course is on working data in a transparent and interpretable manner, not on big data analytics.
+Firstly, a Global COVID-19 Report dataset was sourced from Kaggle with 15,170 observations. This dataset included daily entries of cumulative number of cases of COVID-19 for 185 countries, each with 82 entries dating from January 22nd, 2020 to April 12th, 2020. The following were the relevant variables from the dataset that were used for the analysis:
 
-#Data
-Due to the current state of the world from the COVID-19 pandemic, this report focused on using exploratory data analysis, time series forecasting, and data visualization to forecast the number of incidents, recoveries and deaths on a per country basis. 
+* Country/Region: country of the observation
+* Date: date of the observation
+* Confirmed: cumulative number of confirmed cases on this date
 
-The Global Coronavirus Dataset was sourced from Kaggle and used for this analysis. 
-There were three appropriate datasets that were sourced from Kaggle:
-1. Global Coronavirus Dataset
+```{r,echo=FALSE,include=FALSE}
+covid_data = read.csv(file.path(getwd(), "data", "covid_data", "covid_19_clean_complete.csv"), header = TRUE, stringsAsFactors = FALSE)
+covid_data$Date <- as.Date(covid_data$Date, format="%m/%d/%y")
+dates <- unique(covid_data$Date)
 
-We found a dataset that contains information on every country’s number of confirmed cases, deaths, and recoveries since January 1, 2020. 
+firstDate = dates[1] # Jan 22, 2020
+confirmed_df <- aggregate(Confirmed ~ Country.Region + Date, FUN = sum, data=covid_data)
+death_df <- aggregate(Deaths ~ Country.Region + Date, FUN = sum, data=covid_data)
+recovery_df <- aggregate(Recovered ~ Country.Region + Date, FUN = sum, data=covid_data)
+partial_merge <- merge(confirmed_df, death_df, by = c("Country.Region", "Date"))
+covid_df <- merge(partial_merge, recovery_df, by = c("Country.Region", "Date"))
+countries <- unique(covid_df$Country.Region)
+countries_ts <- lapply(countries, function (x) {
+  country_ts <- covid_df %>% filter(Country.Region == x) %>% select(c(Confirmed, Deaths, Recovered))
+  ts(country_ts, start = as.Date("2020-1-22"), frequency = 365)
+})
 
-2. Countries of the World Fact Sheet Dataset
-3. UN Country Statistics Dataset
+summary(confirmed_df)
+summary(confirmed_df %>% group_by(Country.Region) %>% summarise(count = n()))
+```
+The Confirmed variable ranged from 0 cases reported all the way to 555,313 cases reported, with the mean being 1,800 and median being 0. The central tendency of the data doesn't tell us much since these were cumulative numbers, but it could be understood that more than half of the reported numbers were 0, with an exponential increase as the date progressed.  The outliers of cases on the right of the frequency graph are from United States, which have more confirmed cases in the world than any other country by a large margin. However, due to the approach of the analysis, the outliers would not affect the results of the models. Therefore, no treatment was required.  
 
-We also found 2 other datasets that contain national information on each country, ranging from population to GDP per capita. By combining these 2 datasets, we want to create an interactive dashboard that forecasts the number of cases, recoveries, and deaths per country based on potential correlation with other factors. 
+The frequency distribution of confirmed cases can be viewed in the histogram below.  
 
-Datasets:
+```{r, echo = FALSE,message=FALSE, error = FALSE,fig.height=2.8}
+a <- ggplot(confirmed_df,aes(Confirmed)) + geom_histogram() + stat_bin(aes(y=..count.., label =..count..),geom="text",size=2,vjust=-0.3) + ggtitle("Frequency of Confirmed Cases") + ylab("Frequency")
+a
+```
+&nbsp;
 
-#Analysis
+In the Cumulative Confirmed Cases Over Time plot below, it can be observed that COVID-19 cases have been exponentially increasing in many countries across the world. This trend will be more thoroughly analyzed in the time series analysis.  
 
-#Conclusion
+```{r, echo = FALSE,message=FALSE, error = FALSE,fig.height=3}
+
+b <- ggplot(confirmed_df, aes(Date, Confirmed,group=Country.Region)) + geom_point(size = 0.5) + geom_line() + ylab("Cumulative Confirmed Cases") + ggtitle("Cumulative Confirmed Cases Over Time")
+b
+```
+
+# Analysis
+
+# Conclusion
 
