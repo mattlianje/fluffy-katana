@@ -1,0 +1,37 @@
+---
+title: "MSCI 718 Mini-Project"
+author: "Matthieu Court, Ashar Kandathil, Tyler Lam, Kevin Lee"
+date: "April 22, 2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+*Instructions: Please complete this assignment and submit online to the LEARN Dropbox as a PDF; the PDF will be considered complete for marking. Also upload any source files, for example, any .R or .Rmd files that you used.*
+
+The final project deliverable must include a **PDF report (max 6 pages, references not included)** and any source code for your project.
+
+**NOTE:** the emphasis **must** be on the application, interpretation, and communication of the statistical method. As part of this, you are **not allowed** to do black-box methods like neural nets. As you've seen, this course is on working data in a transparent and interpretable manner, not on big data analytics.
+
+#Data
+Due to the current state of the world from the COVID-19 pandemic, this report focused on using exploratory data analysis, time series forecasting, and data visualization to forecast the number of incidents, recoveries and deaths on a per country basis. 
+
+The Global Coronavirus Dataset was sourced from Kaggle and used for this analysis. 
+There were three appropriate datasets that were sourced from Kaggle:
+1. Global Coronavirus Dataset
+
+We found a dataset that contains information on every country’s number of confirmed cases, deaths, and recoveries since January 1, 2020. 
+
+2. Countries of the World Fact Sheet Dataset
+3. UN Country Statistics Dataset
+
+We also found 2 other datasets that contain national information on each country, ranging from population to GDP per capita. By combining these 2 datasets, we want to create an interactive dashboard that forecasts the number of cases, recoveries, and deaths per country based on potential correlation with other factors. 
+
+Datasets:
+
+#Analysis
+
+#Conclusion
+
