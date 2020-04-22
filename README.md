@@ -3,5 +3,5 @@
 
 
 <p align="center">
-  <img src="data/pics/cover.png" width="450">
+  <img src="data/pics/demo.gif" width="700">
 </p>
