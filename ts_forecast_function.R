@@ -6,8 +6,11 @@ forecast_confirmed <- function(country) {
   country_ts <- covid_data %>% filter(Country.Region == country) %>% select(c(Confirmed))
   country_ts <- ts(country_ts, start = as.Date("2020-1-22"), frequency = 365)
   fit <- auto.arima(country_ts, seasonal = FALSE, stepwise = FALSE, approximation = FALSE)
-  fore <- forecast(fit, h = 30, level = 90)
-  plot(fore, ylab = "Number of People", main = paste("Forecast for Number of Cases in", country), xlab = "Time", xaxt = "n")
+  fore <- forecast(fit, h = 30, level = 90) 
+  autoplot(fore, ylab = "Number of People", main = paste("Forecast for Number of Cases in", country), xlab = "Time", xaxt = "n") +
+    theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())
 }
 
 forecast_confirmed("Canada")
+
+
