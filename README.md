@@ -1,5 +1,4 @@
-# fluffy-katana
-[Prediction] ... ☁️🔮 Trend predicting GIS
+Interactive Dashboard of the COVID-19 Pandemic with Time Series Forecasting
 
 
 <p align="center">
