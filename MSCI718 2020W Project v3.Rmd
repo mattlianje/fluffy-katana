@@ -19,8 +19,13 @@ library(gridExtra)
 # Data  
 
 Due to the current state of the world from the COVID-19 pandemic (as of April 22nd, 2020) and the rise of visualization tools being used to keep track of COVID-19 statistics across the world, we were interested in using concepts that were learned in MSCI 718 and new statistical techniques, more specifically time series analysis and interactive data visualiztion dashboard, to build a deeper understanding of the coronavirus. 
+Due to the current state of the world from the COVID-19 pandemic (as of April 22nd, 2020) and the rise of visualization tools being used to keep track of COVID-19 statistics across the world, we were interested in using concepts that were learned in MSCI 718 and new statistical techniques, such as time series analysis and interactive data visualization dashboards, to build a deeper understanding of the coronavirus. 
 
+<<<<<<< HEAD
 Firstly, a Global COVID-19 Report dataset was sourced from Kaggle with 15,170 observations. This dataset included daily entries of cumulative number of cases of COVID-19 for 185 countries, each with 82 entries dating from January 22nd, 2020 to April 12th, 2020. However, the first case of COVID-19 was recorded in November 2019 [Bryner]. In addition, the actual number of cases in a country may differ from the reported number. For this analysis, we assumed that this data was accurate. The following were the relevant variables from the dataset that were used for the analysis:
+=======
+Firstly, a Global COVID-19 Report dataset was sourced from Kaggle with 15,170 observations. This dataset included daily entries of cumulative number of cases of COVID-19 for 185 countries, each with 82 entries dating from January 22nd, 2020 to April 22nd, 2020. The following were the relevant variables from the dataset that were used for the analysis:
+>>>>>>> aadf80b3775717583389150db83185289055e624
 
 * Country/Region: country of the observation
 * Date: date of the observation
@@ -260,9 +265,19 @@ Therefore, we can infer that the preventative measure to slow the spread of COVI
 
 ## Map Visualization Dashboard
 
+In addition to our report analysis, we have created an interactive visualization dashbord of the map of the world, through Rshiny. This dashboard contains 2 main components:
+1) For a given date, the cumulative amount of *Deaths*, *Recoveries*, and *Confirmed Cases* in magnitude is indicated by a red circle for each country.
+2) For a specific country chosen from the drop-down list, we display 4 graphs: Confirmed Cases, Trajectory of Confirmed Cases, Deaths, and a Forecast for the Future Number of Cases (indicated in blue from April 22 onwards).
+
+To run the app, please open the *app.R* file in our repo, and click "Run App" in RStudio. You may be required to install some dependencies. If you are unable to run the dashboard, you can also refer to our public Github page for a GIF illustrating the functionality of our tool: https://github.com/mattlianje/fluffy-katana
+
+Additionally, you can also refer to our Appendix for screenshots of the dashboard.
 
 # Conclusion
 
+The first 2 sections of this report, pertaining to flattening the curve and time series analysis for 2 Asian countries, lead us to conclusions that the preventative measures the countries have taken, such as enforcing quarantine measures and banning international travel, have indeed slowed the rate of the spread of the virus; essentially they are "flattening the curve". If careful measures had not been taken, our ARIMA model forecasted there would have been tens of thousands more cases by mid-March.
+
+For future endeavours we could explore the effect COVID-19 has on people of different demographics. As testing becomes more available and more data is released, we hope to fine tune our prediction models to more accurately predict the number of infections and provide valuable information for the public and the health care system. 
 
 ## References
 
@@ -275,9 +290,13 @@ Bryner, Jeanna. “1st Known Case of Coronavirus Traced Back to November in Chin
 Greig, Finlay. “How Long Has China Been on Lockdown? Here's When China and Wuhan Went on Lockdown for Coronavirus.” Edinburgh News, Edinburgh News, 6 Apr. 2020, www.edinburghnews.scotsman.com/health/how-long-has-china-been-lockdown-heres-when-china-and-wuhan-went-lockdown-coronavirus-restrictions-approach-end-2514773.
 
 
+<<<<<<< HEAD
 Hyndman, Robert. “Thoughts on the Ljung-Box Test.” Hyndsight, 24 Jan. 2014, www.robjhyndman.com/hyndsight/ljung-box-test/.
 
 
   
 
 
+=======
+Hyndman, Robert. “Thoughts on the Ljung-Box Test.” Hyndsight, 24 Jan. 2014, www.robjhyndman.com/hyndsight/ljung-box-test/.
+>>>>>>> aadf80b3775717583389150db83185289055e624
