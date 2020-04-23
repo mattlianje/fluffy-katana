@@ -51,6 +51,7 @@ names(covid_df)[names(covid_df) == "Country.Region"] <- "Country"
 names(covid_df)[names(covid_df) == "Lat"] <- "lat"
 names(covid_df)[names(covid_df) == "Long"] <- "long"
 main_df <<- merge(x=covid_df, y=country_df, by="Country", all.x=TRUE)
+main_df$Date <- as.Date(main_df$Date, format="%m/%d/%y")
 
 ### Helper functions ###
 
@@ -136,8 +137,8 @@ ui <- bootstrapPage(theme = shinytheme('cosmo'),
   leafletOutput("map", width = "100%", height = "100%"),
   absolutePanel(top = 10, right = 20,
                 useShinyjs(),
-                sliderInput("date_slider", "Date (cumulative)", min = as.Date('2020-1-22'),
-                            max =as.Date('2020-5-20'),value=as.Date("2020-4-01"),timeFormat="%b %d - %Y"),
+                sliderInput("date_slider", "Date (cumulative)", min = min(main_df$Date),
+                            max = max(main_df$Date),value=as.Date("2020-4-01"),timeFormat="%b %d - %Y"),
                 selectInput("dimension", "Country (projections)",
                             main_df$Country, selected = "Canada", multiple = FALSE
                 ),
@@ -147,7 +148,7 @@ ui <- bootstrapPage(theme = shinytheme('cosmo'),
                 plotOutput("plot_change_confirmed", height="125px"),
                 plotOutput("plot_deaths", height="125px"),
                 plotOutput("time_series", height="125px"),#,
-                #checkboxInput("legend", "Show legend", TRUE)
+                #checkboxInput("legend", "Show legend", TRUE)as.Date(as.yearmon(dataset$minDate))
   )
 )
 
