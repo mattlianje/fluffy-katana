@@ -20,7 +20,7 @@ library(gridExtra)
 
 Due to the current state of the world from the COVID-19 pandemic (as of April 22nd, 2020) and the rise of visualization tools being used to keep track of COVID-19 statistics across the world, we were interested in using concepts that were learned in MSCI 718 and new statistical techniques, more specifically time series analysis and interactive data visualiztion dashboard, to build a deeper understanding of the coronavirus. 
 
-Firstly, a Global COVID-19 Report dataset was sourced from Kaggle with 15,170 observations. This dataset included daily entries of cumulative number of cases of COVID-19 for 185 countries, each with 82 entries dating from January 22nd, 2020 to April 12th, 2020. The following were the relevant variables from the dataset that were used for the analysis:
+Firstly, a Global COVID-19 Report dataset was sourced from Kaggle with 15,170 observations. This dataset included daily entries of cumulative number of cases of COVID-19 for 185 countries, each with 82 entries dating from January 22nd, 2020 to April 12th, 2020. However, the first case of COVID-19 was recorded in November 2019 [Bryner]. In addition, the actual number of cases in a country may differ from the reported number. For this analysis, we assumed that this data was accurate. The following were the relevant variables from the dataset that were used for the analysis:
 
 * Country/Region: country of the observation
 * Date: date of the observation
@@ -50,7 +50,7 @@ The Confirmed variable ranged from 0 cases reported all the way to 555,313 cases
 
 The frequency distribution of confirmed cases can be viewed in the histogram below.  
 
-```{r, echo = FALSE,message=FALSE, error = FALSE,fig.height=2.8}
+```{r, echo = FALSE,message=FALSE, error = FALSE,fig.height=2.5}
 a <- ggplot(confirmed_df,aes(Confirmed)) + geom_histogram() + stat_bin(aes(y=..count.., label =..count..),geom="text",size=2,vjust=-0.3) + ggtitle("Frequency of Confirmed Cases") + ylab("Frequency")
 a
 ```
@@ -142,7 +142,7 @@ grid.arrange(p1, p2, p3, ncol=3)
 
 A trajectory graph better illustrates the state of flattening the curve. The y axis represents the new confirmed cases in the past week, and the x axis represents the total confirmed cases. If the growth rate is exponential we can expect the graph to have a positive linear pattern. This can be demonstrated by graphing the function y=2^x. Once the growth has slowed and is no longer exponential, there a sharp dip in the graph.
 
-A country that has done really well in containing the virus is South Korea. As demonstrated by the linear growth, South Korea started with an exponential growth like every other country, but their effective social distancing and rapid testing measures is reflected in the graph's sharp dip.
+A country that has done really well in containing the virus is South Korea [Bhatia]. As demonstrated by the linear growth, South Korea started with an exponential growth like every other country, but their effective social distancing and rapid testing measures is reflected in the graph's sharp dip.
 
 Using this graph provides a clear visual indication if a country has beaten the exponential growth and is on the right track towards flattening the curve.
 
@@ -266,10 +266,18 @@ Therefore, we can infer that the preventative measure to slow the spread of COVI
 
 ## References
 
+Bhatia, Aatish. “Covid Trends.” aatishb.com/covidtrends/. 
+
+
+Bryner, Jeanna. “1st Known Case of Coronavirus Traced Back to November in China.” LiveScience, Purch, 14 Mar. 2020, www.livescience.com/first-case-coronavirus-found.html.
+
+
 Greig, Finlay. “How Long Has China Been on Lockdown? Here's When China and Wuhan Went on Lockdown for Coronavirus.” Edinburgh News, Edinburgh News, 6 Apr. 2020, www.edinburghnews.scotsman.com/health/how-long-has-china-been-lockdown-heres-when-china-and-wuhan-went-lockdown-coronavirus-restrictions-approach-end-2514773.
 
 
 Hyndman, Robert. “Thoughts on the Ljung-Box Test.” Hyndsight, 24 Jan. 2014, www.robjhyndman.com/hyndsight/ljung-box-test/.
+
+
   
 
 
