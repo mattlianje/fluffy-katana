@@ -1,0 +1,290 @@
+---
+title: "MSCI 718 Mini-Project: COVID-19 Time Series Analysis and Visualization"
+author: "Matthieu Court, Ashar Kandathil, Tyler Lam, Kevin Lee"
+date: "April 22, 2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(zoo)
+library(tseries)
+library(forecast)
+library(gridExtra)
+```
+
+# Data  
+
+Due to the current state of the world from the COVID-19 pandemic (as of April 22nd, 2020) and the rise of visualization tools being used to keep track of COVID-19 statistics across the world, we were interested in using concepts that were learned in MSCI 718 and new statistical techniques, such as time series analysis and interactive data visualization dashboards, to build a deeper understanding of the coronavirus. 
+
+Firstly, a Global COVID-19 Report dataset was sourced from Kaggle with 15,170 observations. This dataset included daily entries of cumulative number of cases of COVID-19 for 185 countries, each with 82 entries dating from January 22nd, 2020 to April 22nd, 2020. The following were the relevant variables from the dataset that were used for the analysis:
+
+* Country/Region: country of the observation
+* Date: date of the observation
+* Confirmed: cumulative number of confirmed cases on this date
+
+```{r,echo=FALSE,include=FALSE}
+covid_data = read.csv(file.path(getwd(), "data", "covid_data", "covid_19_clean_complete.csv"), header = TRUE, stringsAsFactors = FALSE)
+covid_data$Date <- as.Date(covid_data$Date, format="%m/%d/%y")
+dates <- unique(covid_data$Date)
+
+firstDate = dates[1] # Jan 22, 2020
+confirmed_df <- aggregate(Confirmed ~ Country.Region + Date, FUN = sum, data=covid_data)
+death_df <- aggregate(Deaths ~ Country.Region + Date, FUN = sum, data=covid_data)
+recovery_df <- aggregate(Recovered ~ Country.Region + Date, FUN = sum, data=covid_data)
+partial_merge <- merge(confirmed_df, death_df, by = c("Country.Region", "Date"))
+covid_df <- merge(partial_merge, recovery_df, by = c("Country.Region", "Date"))
+countries <- unique(covid_df$Country.Region)
+countries_ts <- lapply(countries, function (x) {
+  country_ts <- covid_df %>% filter(Country.Region == x) %>% select(c(Confirmed, Deaths, Recovered))
+  ts(country_ts, start = as.Date("2020-1-22"), frequency = 365)
+})
+
+summary(confirmed_df)
+summary(confirmed_df %>% group_by(Country.Region) %>% summarise(count = n()))
+```
+The Confirmed variable ranged from 0 cases reported all the way to 555,313 cases reported, with the mean being 1,800 and median being 0. The central tendency of the data doesn't tell us much since these were cumulative numbers, but it could be understood that more than half of the reported numbers were 0, with an exponential increase as the date progressed.  The outliers of cases on the right of the frequency graph are from United States, which have more confirmed cases in the world than any other country by a large margin. However, due to the approach of the analysis, the outliers would not affect the results of the models. Therefore, no treatment was required.  
+
+The frequency distribution of confirmed cases can be viewed in the histogram below.  
+
+```{r, echo = FALSE,message=FALSE, error = FALSE,fig.height=2.5}
+a <- ggplot(confirmed_df,aes(Confirmed)) + geom_histogram() + stat_bin(aes(y=..count.., label =..count..),geom="text",size=2,vjust=-0.3) + ggtitle("Frequency of Confirmed Cases") + ylab("Frequency")
+a
+```
+&nbsp;
+
+In the Cumulative Confirmed Cases Over Time plot below, it can be observed that COVID-19 cases have been exponentially increasing in many countries across the world. This trend will be more thoroughly analyzed in the time series analysis.  
+
+```{r, echo = FALSE,message=FALSE, error = FALSE,fig.height=2.5}
+
+b <- ggplot(confirmed_df, aes(Date, Confirmed,group=Country.Region)) + geom_point(size = 0.5) + geom_line() + ylab("Cumulative Confirmed Cases") + ggtitle("Cumulative Confirmed Cases Over Time")
+b
+```
+
+
+
+```{r, include=FALSE, echo = FALSE,message=FALSE, error = FALSE,fig.height=2.5}
+# IMPORTANT must import the data and apply these manipulations first. Otherwise the function will not work
+covid_set <- read.csv('data/covid_data/covid_19_clean_complete.csv')
+covid_set <- covid_set %>% mutate(date_str =  as.Date(as.POSIXct(Date, format="%m/%d/%y"))) %>% arrange(date_str)
+```
+
+```{r, include=FALSE, echo = FALSE,message=FALSE, error = FALSE,fig.height=2.5}
+# plotting deaths function
+# USAGE: plot_deaths('Canada')
+plot_deaths <- function(country) {
+  country_set <- covid_set %>% filter(Country.Region == country)
+  country_set.agg <- aggregate(select(country_set, Confirmed, Deaths, Recovered), by=country_set['date_str'], sum)
+  deaths <- ggplot(country_set.agg, mapping = aes(date_str, Deaths)) + geom_line() + labs(title=paste('Deaths', country), x='Date', y='Deaths')
+  return(deaths)
+}
+# plotting confirmed function
+# USAGE: plot_confirmed('Canada')
+plot_confirmed <- function(country) {
+  country_set <- covid_set %>% filter(Country.Region == country)
+  country_set.agg <- aggregate(select(country_set, Confirmed, Deaths, Recovered), by=country_set['date_str'], sum)
+  confirmed <- ggplot(country_set.agg, mapping = aes(date_str, Confirmed)) + geom_line() + labs(title=paste('Confirmed Cases', country), x='Date', y='Cases')
+  return(confirmed)
+}
+# plotting recovered function
+# USAGE: plot_confirmed('Canada')
+plot_recovered <- function(country) {
+  country_set <- covid_set %>% filter(Country.Region == country)
+  country_set.agg <- aggregate(select(country_set, Confirmed, Deaths, Recovered), by=country_set['date_str'], sum)
+  recovered <- ggplot(country_set.agg, mapping = aes(date_str, Recovered)) + geom_line() + labs(title=paste('Recovered ', country), x='Date', y='Recovered')
+  return(recovered)
+}
+plot_deaths('Canada')
+plot_confirmed('Canada')
+plot_recovered('Canada')
+```
+
+```{r, include=FALSE, echo = FALSE,message=FALSE, error = FALSE,fig.height=2.5}
+# plotting change in deaths
+# USAGE plot_change_deaths('Canada')
+plot_change_deaths <- function(country) {
+  country_set <- covid_set %>% filter(Country.Region == country)
+  country_set.agg <- aggregate(select(country_set, Confirmed, Deaths, Recovered), by=country_set['date_str'], sum)
+  country_set.new_by_week <- country_set.agg %>% mutate(new_deaths_by_week=Deaths - lag(Deaths, 7))
+  plot <- ggplot(country_set.new_by_week, mapping = aes(Deaths, new_deaths_by_week)) + geom_line() + labs(title=paste('Trajectory of Deaths', country), y='New Deaths (past week)', x='Total Deaths')
+  return(plot)
+}
+# plotting change in cases
+# USAGE plot_change_confirmed('Canada')
+plot_change_confirmed <- function(country) {
+  country_set <- covid_set %>% filter(Country.Region == country)
+  country_set.agg <- aggregate(select(country_set, Confirmed, Deaths, Recovered), by=country_set['date_str'], sum)
+  country_set.new_by_week <- country_set.agg %>% mutate(new_confirmed_by_week=Confirmed - lag(Confirmed, 7))
+  plot <- ggplot(country_set.new_by_week, mapping = aes(Confirmed, new_confirmed_by_week)) + geom_line() + labs(title=paste('Trajectory of Confirmed Cases', country), y='New Confirmed Cases (past week)', x='Total Confirmed Cases')
+  return(plot)
+}
+plot_change_deaths('Canada')
+plot_change_confirmed('Canada')
+```
+
+# Analysis
+## Are We Flattening the Curve?
+
+Governments all over the world have enacted social distancing measures in attempts to "flatten the curve". In more mathematical terms, flattening the curve means slowing the growth rate of the virus such that it is no longer on an exponential trajectory. This prevents the health care system from being overwhelmed and increase everyone's chances of surviving the virus. When we plot the confirmed cases over time it's difficult to visually tell if the growth is still exponential or if social distancing has slowed the growth.
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.height=2.5}
+p1 <- plot_confirmed('South Korea') + theme(plot.title = element_text(size = 8), axis.title = element_text(size=7), axis.text = element_text(size=5)) 
+p2 <- plot_change_confirmed('South Korea') + theme(plot.title = element_text(size = 8), axis.title = element_text(size=7), axis.text = element_text(size=5)) + ggtitle("Trajectory of Confirmed Cases SK")
+y <- c(0,2,4,8,16,32,64,128,256)
+x <- c(0,2,6,14,30,62,126,254,510)
+p3 <- ggplot(data.frame(x,y), aes(x, y)) + geom_line() + geom_point() + labs(title='y=2^x', x='Total Confirmed Cases', y='New Cases (past week)') + theme(plot.title = element_text(size = 8), axis.title = element_text(size=7), axis.text = element_text(size=5))
+grid.arrange(p1, p2, p3, ncol=3)
+```
+
+
+A trajectory graph better illustrates the state of flattening the curve. The y axis represents the new confirmed cases in the past week, and the x axis represents the total confirmed cases. If the growth rate is exponential we can expect the graph to have a positive linear pattern. This can be demonstrated by graphing the function y=2^x. Once the growth has slowed and is no longer exponential, there a sharp dip in the graph.
+
+A country that has done really well in containing the virus is South Korea [Bhatia]. As demonstrated by the linear growth, South Korea started with an exponential growth like every other country, but their effective social distancing and rapid testing measures is reflected in the graph's sharp dip.
+
+Using this graph provides a clear visual indication if a country has beaten the exponential growth and is on the right track towards flattening the curve.
+
+## Time Series Analysis
+Using ARIMA modeling, we wish to generate useful forecasts of what the situation could be like before and after various quarantine and social-distancing protocols were enacted, to see whether the "curve is flattening" and to what extent. For this report analyses we will only focus on 1 country. 
+
+For the rest of the countries we will forecast the further spread given the latest data, to be displayed on our Rshiny dashboard.
+
+We understand that this is an extremely complex topic with numerous factors that determine the rate of spread, death, and recoveries for any given country. However, to simplify things we will carry on with the assumption that in order to combat the spread, there was a specific date in which preventative measures were enabled for the given country.
+
+Note: Our global data starts from January 22, 2020. However, in reality the first cases of the virus were recorded in November of 2019. Given our small dataset and the continual growth of COVID-19, we assume non-seasonality.
+
+```{r, include = FALSE, fig.height = 2.5}
+# READ AND AUGMENT DATA
+covid_data = read.csv(file.path(getwd(), "data", "covid_data", "covid_19_clean_complete.csv"), header = TRUE, stringsAsFactors = FALSE)
+covid_data$Date <- as.Date(covid_data$Date, format="%m/%d/%y")
+dates <- unique(covid_data$Date)
+firstDate = dates[1] # Jan 22, 2020
+confirmed_df <- aggregate(Confirmed ~ Country.Region + Date, FUN = sum, data=covid_data)
+death_df <- aggregate(Deaths ~ Country.Region + Date, FUN = sum, data=covid_data)
+recovery_df <- aggregate(Recovered ~ Country.Region + Date, FUN = sum, data=covid_data)
+partial_merge <- merge(confirmed_df, death_df, by = c("Country.Region", "Date"))
+covid_df <- merge(partial_merge, recovery_df, by = c("Country.Region", "Date"))
+countries <- unique(covid_df$Country.Region)
+countries_ts <- lapply(countries, function (x) {
+  country_ts <- covid_df %>% filter(Country.Region == x) %>% select(c(Confirmed, Deaths, Recovered))
+  ts(country_ts, start = as.Date("2020-1-22"), frequency = 365)
+})
+```
+
+```{r, include=FALSE, fig.height=2.5}
+# FUNCTION DEFINITIONS
+get_country_ts <- function(country_name){
+  idx = which(countries == country_name)[[1]]
+  countries_ts[[idx]]
+}
+augmented_dickey_fuller <- function(c_ts, series, regular, lag_order) {
+  if(regular==FALSE){
+    adf.test(diff(log(c_ts[, series])), alternative = "stationary", k = lag_order)
+  } else {
+    adf.test(c_ts[, series], alternative = "stationary", k = lag_order)
+  }
+}
+date_filtered_zoo <- function(country_name, endDate) {
+  wantedDates <- dates[between(dates, firstDate, as.Date(endDate))]
+  country_ts <- covid_df %>% filter(Country.Region == country_name, between(dates, firstDate, as.Date(endDate))) %>% select(Confirmed)
+  zoo(country_ts, wantedDates)
+}
+plot_zoo <- function(country_zoo, country_name) {
+  autoplot(country_zoo, main = paste("COVID-19 Confirmed Cases in", country_name)) + labs(x = "Date", y = "Number of People")
+}
+plot_ts <- function(country_ts, country_name) {
+  autoplot(country_ts, main = paste("COVID-19 Statistics in", country_name, "Since Jan 22")) + labs(x = "Time", y = "Number of People") + theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())
+}
+```
+
+Let us begin by looking at the country where the disease was first encountered - China. By looking into how the disease spread and China handled the situation first, we may be able anticipate how other countries should handle the situation.
+
+```{r, echo=FALSE,fig.height=2.1}
+# China
+china_zoo <- date_filtered_zoo("China", "2020-4-12")
+plot_zoo(china_zoo, "China")
+```
+The first graph we want to look at is the number of confirmed cases in China to date. As we can see from our preliminary plot, there was a sharp spike in cases from January till March, after which the curve appears to be "flattened".
+
+From external research, it appears that China began its lockdown measures in Wuhan around January 29, which continued to rollout across the country [Greig]. However, it takes a couple weeks for the effects of such measures to show, as people can be asymptomatic for 14 days. For simplicity, we will assume that February 12 (2 weeks after preventative measures) as the cut-off point for all of China.
+
+Let us forecast the number of potential cases that would exist in China if no preventative measures were taken. 
+
+```{r, echo=FALSE, fig.height=2.5}
+before_china_zoo <- date_filtered_zoo("China", "2020-2-12")
+plot_zoo(before_china_zoo, "China")
+```
+To start with, we must first determine the stationarity of our time series with the Augmented Dickey-Fuller test. We can assume a k-value (lag) of *n/5 = 4.2 ~ 4* as recommended for non-seasonal series [Hyndman].
+```{r, echo=FALSE, warning = FALSE, fig.height=2.5}
+china_ts <- get_country_ts("China")
+before_china_ts <- head(china_ts, 21) # Feb 12 is 3 weeks from Jan 22 = 21 days
+augmented_dickey_fuller(before_china_ts, "Confirmed", TRUE, 4)
+```
+According to the test, it appears that the data is non-stationary given the high p-value. Let us remove the unequal variances and trend components, by taking the log and difference of the series, respectively.
+```{r, echo=FALSE, warning = FALSE, fig.height=2.5}
+augmented_dickey_fuller(before_china_ts, "Confirmed", FALSE, 4)
+```
+Now the p-value is very small and clearly significant. Hence, the data is now stationary.
+
+Let us plot the ACF and PACF charts to determine the *p* and *q* portions of our ARIMA model.  
+&nbsp;
+
+```{r, echo=FALSE,fig.height=2.5}
+c <- ggAcf(diff(log(before_china_ts[,"Confirmed"]))) + ggtitle("Confirmed Cases ACF Plot")
+d <- ggPacf(diff(log(before_china_ts[,"Confirmed"]))) + ggtitle("Confirmed Cases PACF Plot")
+grid.arrange(c,d,ncol=2)
+```
+It appears that the series is mostly represented by an Auto-Regressive (AR) model due to the entire PACF plot cutting off and the ACF plot only cutting off after the 2nd lag. We would assume an ARIMA(0,1,2) model. However, it is wise to experiment with different combinations to find the best ARIMA(p,d,q) values that have the lowest AIC and BIC.
+
+Rather than conduct this manually, we will use the `auto.arima()` function to calculate it automatically for us, with the `seasonal`, `stepwise`, and `approximation` parameters set to `FALSE` so that the best model can be chosen.
+```{r, echo=FALSE,fig.height=2.5}
+china_fit <- auto.arima(before_china_ts[, "Confirmed"], seasonal = FALSE, stepwise = FALSE, approximation = FALSE)
+china_fit
+```
+As we see from the output, our series follows an ARIMA(1,2,0) model (contrary to our initial estimation of ARIMA(0,1,2)).
+
+Let us now forecast the infection rate if China had not taken any preventative measures, for a month after February 12.  
+&nbsp; 
+```{r, echo=FALSE,fig.height=3.5}
+china_fore <- forecast(china_fit, h = 30, level = 90)
+plot(china_fore, ylab = "Number of People", main = "Forecasts for Confirmed Cases from Feb 12", xlab = "Time", xaxt = "n")
+```
+
+&nbsp; 
+ 
+As seen from the line in blue, our forecasting till March 12 is approximately 100,000 infections (20,000 higher than the Confirmed cases by April 12), with 90% *prediction intervals* going upwards of 200,000 infections.
+
+Therefore, we can infer that the preventative measure to slow the spread of COVID-19 truly are "flattening the curve".
+
+## Map Visualization Dashboard
+
+In addition to our report analysis, we have created an interactive visualization dashbord of the map of the world, through Rshiny. This dashboard contains 2 main components:
+
+1) For a given date, the cumulative amount of *Deaths*, *Recoveries*, and *Confirmed Cases* in magnitude is indicated by a red circle for each country.
+
+2) For a specific country chosen from the drop-down list, we display 4 graphs: Confirmed Cases, Trajectory of Confirmed Cases, Deaths, and a Forecast for the Future Number of Cases (indicated in blue from April 22 onwards).
+
+To run the app, please open the *app.R* file in our repo, and click "Run App" in RStudio. You may be required to install some dependencies. If you are unable to run the dashboard, you can also refer to our public Github page for a GIF illustrating the functionality of our tool: https://github.com/mattlianje/fluffy-katana
+
+Additionally, you can also refer to our Appendix for screenshots of the dashboard.
+
+# Conclusion
+
+The first 2 sections of this report, pertaining to flattening the curve and time series analysis for 2 Asian countries, lead us to conclusions that the preventative measures the countries have taken, such as enforcing quarantine measures and banning international travel, have indeed slowed the rate of the spread of the virus; essentially they are "flattening the curve". If careful measures had not been taken, our ARIMA model forecasted there would have been tens of thousands more cases by mid-March.
+
+For future endeavours we could explore the effect COVID-19 has on people of different demographics. As testing becomes more available and more data is released, we hope to fine tune our prediction models to more accurately predict the number of infections and provide valuable information for the public and the health care system. 
+
+## References
+
+Bhatia, Aatish. “Covid Trends.” aatishb.com/covidtrends/. 
+
+
+Bryner, Jeanna. “1st Known Case of Coronavirus Traced Back to November in China.” LiveScience, Purch, 14 Mar. 2020, www.livescience.com/first-case-coronavirus-found.html.
+
+
+Greig, Finlay. “How Long Has China Been on Lockdown? Here's When China and Wuhan Went on Lockdown for Coronavirus.” Edinburgh News, Edinburgh News, 6 Apr. 2020, www.edinburghnews.scotsman.com/health/how-long-has-china-been-lockdown-heres-when-china-and-wuhan-went-lockdown-coronavirus-restrictions-approach-end-2514773.
+
+
+Hyndman, Robert. “Thoughts on the Ljung-Box Test.” Hyndsight, 24 Jan. 2014, www.robjhyndman.com/hyndsight/ljung-box-test/.
